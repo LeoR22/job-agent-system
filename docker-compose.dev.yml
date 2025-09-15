@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: job-agent-postgres-dev
+    environment:
+      POSTGRES_DB: job_agent_dev
+      POSTGRES_USER: job_agent_user
+      POSTGRES_PASSWORD: password123
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - job-agent-dev-network
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: job-agent-redis-dev
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - job-agent-dev-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: job-agent-backend-dev
+    environment:
+      - DATABASE_URL=postgresql://job_agent_user:password123@postgres:5432/job_agent_dev
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - DEBUG=true
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend:/app
+      - ./uploads:/app/uploads
+    networks:
+      - job-agent-dev-network
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: job-agent-frontend-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000/api/v1
+      - VITE_ENABLE_DEBUG=true
+    depends_on:
+      - backend
+    networks:
+      - job-agent-dev-network
+    command: npm run dev
+
+  # Celery Worker (Optional for development)
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: job-agent-celery-worker-dev
+    environment:
+      - DATABASE_URL=postgresql://job_agent_user:password123@postgres:5432/job_agent_dev
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - DEBUG=true
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend:/app
+      - ./uploads:/app/uploads
+    networks:
+      - job-agent-dev-network
+    command: celery -A app.core.celery worker --loglevel=info
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+
+networks:
+  job-agent-dev-network:
+    driver: bridge

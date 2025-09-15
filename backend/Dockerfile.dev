@@ -1,0 +1,45 @@
+# Dockerfile for development backend
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+ENV DEBUG=true
+
+# Install system dependencies including development tools
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libpq-dev \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Set work directory
+WORKDIR /app
+
+# Copy requirements first for better layer caching
+COPY requirements.txt .
+
+# Install Python dependencies including development dependencies
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install pytest pytest-cov pytest-asyncio pytest-mock black isort flake8 mypy bandit pre-commit
+
+# Copy application code
+COPY . .
+
+# Create uploads directory
+RUN mkdir -p uploads && chown -R appuser:appuser /app
+
+# Switch to app user
+USER appuser
+
+# Expose port
+EXPOSE 8000
+
+# Run application in development mode
+CMD ["uvicorn", "app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,130 @@
+name: Monitoring and Health Checks
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [staging, production]
+
+    steps:
+    - name: Health Check
+      run: |
+        response=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.HEALTH_CHECK_URL }})
+        if [ $response -ne 200 ]; then
+          echo "Health check failed with status code: $response"
+          exit 1
+        fi
+      env:
+        HEALTH_CHECK_URL: ${{ secrets.HEALTH_CHECK_URL }}
+
+    - name: Check Database Connectivity
+      run: |
+        response=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.HEALTH_CHECK_URL }}/db")
+        if [ $response -ne 200 ]; then
+          echo "Database health check failed with status code: $response"
+          exit 1
+        fi
+      env:
+        HEALTH_CHECK_URL: ${{ secrets.HEALTH_CHECK_URL }}
+
+    - name: Check External APIs
+      run: |
+        # Check OpenAI API
+        openai_status=$(curl -s -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" -o /dev/null -w "%{http_code}" https://api.openai.com/v1/models)
+        if [ $openai_status -ne 200 ]; then
+          echo "OpenAI API check failed"
+          exit 1
+        fi
+        
+        # Check MCP services if available
+        if [ -n "${{ secrets.MCP_API_KEY }}" ]; then
+          mcp_status=$(curl -s -H "Authorization: Bearer ${{ secrets.MCP_API_KEY }}" -o /dev/null -w "%{http_code}" "${{ secrets.MCP_BASE_URL }}/health")
+          if [ $mcp_status -ne 200 ]; then
+            echo "MCP service check failed"
+            exit 1
+          fi
+        fi
+
+    - name: Send notification on failure
+      if: failure()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        channel: '#alerts'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+  performance-monitoring:
+    name: Performance Monitoring
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check Response Times
+      run: |
+        # Measure API response times
+        total_time=0
+        for i in {1..5}; do
+          time=$(curl -o /dev/null -s -w "%{time_total}" "${{ secrets.HEALTH_CHECK_URL }}")
+          total_time=$(echo "$total_time + $time" | bc)
+        done
+        avg_time=$(echo "scale=3; $total_time / 5" | bc)
+        
+        echo "Average response time: ${avg_time}s"
+        
+        # Alert if response time is too high
+        if (( $(echo "$avg_time > 2.0" | bc -l) )); then
+          echo "High response time detected: ${avg_time}s"
+          exit 1
+        fi
+      env:
+        HEALTH_CHECK_URL: ${{ secrets.HEALTH_CHECK_URL }}
+
+    - name: Check Error Rates
+      run: |
+        # This would typically query your monitoring system
+        # For now, we'll simulate with a simple check
+        error_rate=$(curl -s "${{ secrets.MONITORING_URL }}/error-rate" || echo "0")
+        
+        echo "Current error rate: ${error_rate}%"
+        
+        # Alert if error rate is too high
+        if (( $(echo "$error_rate > 5" | bc -l) )); then
+          echo "High error rate detected: ${error_rate}%"
+          exit 1
+        fi
+      env:
+        MONITORING_URL: ${{ secrets.MONITORING_URL }}
+
+  cleanup:
+    name: Cleanup Old Data
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install sqlalchemy psycopg2-binary
+
+    - name: Run cleanup script
+      run: |
+        python scripts/cleanup_old_data.py
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}

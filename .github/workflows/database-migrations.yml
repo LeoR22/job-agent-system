@@ -1,0 +1,51 @@
+name: Database Migrations
+
+on:
+  push:
+    paths:
+      - 'backend/migrations/**'
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  run-migrations:
+    name: Run Database Migrations
+    runs-on: ubuntu-latest
+
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install alembic psycopg2-binary
+
+    - name: Run migrations
+      run: |
+        cd backend
+        alembic upgrade head
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    - name: Create migration backup
+      run: |
+        cd backend
+        alembic current > migration-backup.txt
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    - name: Upload migration backup
+      uses: actions/upload-artifact@v3
+      with:
+        name: migration-backup
+        path: backend/migration-backup.txt
