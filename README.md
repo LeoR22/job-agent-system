@@ -531,25 +531,24 @@ El proyecto incluye una configuración completa de CI/CD con GitHub Actions:
 - **FastAPI**: Pydantic models, dependency injection
 - **SQL**: SQLAlchemy ORM, migraciones con Alembic
 
+
+
+## Contribuciones
+
+**Si deseas contribuir a este proyecto, sigue estos pasos:**
+
+1. Haz un fork del repositorio.
+2. Crea una nueva rama (`git checkout -b feature-nueva-funcionalidad`).
+3. Realiza tus cambios y haz commit (`git commit -m 'Agrega nueva funcionalidad'`).
+4. Sube los cambios a la rama (`git push origin feature-nueva-funcionalidad`).
+5. Abre un Pull Request.
+
 ## 📄 Licencia
+Este proyecto está licenciado bajo la Licencia MIT. Consulta el archivo LICENSE para más detalles.
 
-Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para detalles.
+## Contacto
+Leandro Rivera: <leo.232rivera@gmail.com>
 
-## 🙏 Agradecimientos
+### ¡Feliz Codificación! 🚀
+Si encuentras útil este proyecto, ¡dale una ⭐ en GitHub! 😊
 
-- **OpenAI** Por los modelos de lenguaje GPT
-- **LangChain** Por el framework de agentes
-- **FastAPI** Por el excelente framework web
-- **React** Por la librería frontend
-- **Docker** Por la plataforma de contenerización
-- **PostgreSQL** Por la base de datos robusta
-
-## 📞 Contacto
-
-- **Issues**: GitHub Issues
-- **Email**: soporte@jobagent-system.com
-- **Discord**: [Servidor de comunidad](https://discord.gg/jobagent)
-
----
-
-🎉 **¡Gracias por usar Job Agent System!** 🎉
