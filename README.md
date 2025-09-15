@@ -155,7 +155,7 @@ Tareas en segundo plano con Celery:
 
 1. **Clonar el repositorio**
    ```bash
-   git clone <repository-url>
+   git clone (https://github.com/LeoR22/job-agent-system.git)
    cd job-agent-system
    ```
 
